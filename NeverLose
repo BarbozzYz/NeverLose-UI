@@ -1251,8 +1251,13 @@ win:_connect(UIS.InputEnded, function(input)
     end
     if match then
         el:Set(false)
-    end
-end)
+    
+	end -- fecha o if hasGear
+
+	el:Set(o.Default, true, true)
+	return el
+end -- fecha Card:AddCheckbox
+
 -- ---------- BUTTON ----------
 function Card:AddButton(o)
 	local win = self.Win
