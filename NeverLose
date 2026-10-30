@@ -401,14 +401,28 @@ local function drawExpand(parent, color, pos)
 	return h, parts
 end
 
+-- language: Luau, file: NLib.lua — shortKey com MB1/MB2/MB3
 local function shortKey(k)
-	if not k then
-		return nil
-	end
-	local n = k.Name:gsub("^Left", "L")
-	n = n:gsub("^Right", "R")
-	n = n:gsub("Control", "Ctrl")
-	return n
+    if not k then
+        return nil
+    end
+    if typeof(k) == "EnumItem" then
+        if k.EnumType == Enum.UserInputType then
+            if k == Enum.UserInputType.MouseButton1 then return "MB1" end
+            if k == Enum.UserInputType.MouseButton2 then return "MB2" end
+            if k == Enum.UserInputType.MouseButton3 then return "MB3" end
+            if k == Enum.UserInputType.MouseMovement then return "MMove" end
+            if k == Enum.UserInputType.MouseWheel then return "MWheel" end
+            return k.Name
+        end
+        if k.EnumType == Enum.KeyCode then
+            local n = k.Name:gsub("^Left", "L")
+            n = n:gsub("^Right", "R")
+            n = n:gsub("Control", "Ctrl")
+            return n
+        end
+    end
+    return tostring(k)
 end
 
 -- ====================================================================
@@ -529,6 +543,7 @@ end
 -- ====================================================================
 -- KEYBIND BOX
 -- ====================================================================
+-- language: Luau, file: NLib.lua — keybindBox com suporte a MB1/MB2/MB3
 local function keybindBox(win, parent, size, pos, anchor, default, onChange)
 	local btn = new("TextButton", {
 		Text = "",
@@ -550,6 +565,7 @@ local function keybindBox(win, parent, size, pos, anchor, default, onChange)
 
 	local obj = { Button = btn, Value = default, Waiting = false }
 	local token = 0
+	local armedAt = 0 -- ignora o input do mesmo frame em que Begin() foi chamado
 
 	local function show()
 		local n = shortKey(obj.Value)
@@ -563,6 +579,7 @@ local function keybindBox(win, parent, size, pos, anchor, default, onChange)
 		end
 		self.Waiting = true
 		token += 1
+		armedAt = tick()
 		local my = token
 		tween(st, 0.2, { Color = T.Accent })
 		txt.TextColor3 = T.Accent
@@ -597,19 +614,42 @@ local function keybindBox(win, parent, size, pos, anchor, default, onChange)
 	btn.MouseLeave:Connect(function()
 		tween(btn, 0.15, { BackgroundColor3 = T.Field })
 	end)
+
 	win:_connect(UIS.InputBegan, function(input)
-		if obj.Waiting and input.UserInputType == Enum.UserInputType.Keyboard then
-			obj.Waiting = false
-			token += 1
+		if not obj.Waiting then
+			return
+		end
+		-- o clique que abriu a captura não pode ser capturado como bind
+		if tick() - armedAt < 0.08 then
+			return
+		end
+
+		local kb = input.UserInputType == Enum.UserInputType.Keyboard
+		local mb = input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.MouseButton2
+			or input.UserInputType == Enum.UserInputType.MouseButton3
+		if not (kb or mb) then
+			return
+		end
+
+		obj.Waiting = false
+		token += 1
+
+		if kb then
 			if input.KeyCode == Enum.KeyCode.Escape then
 				obj.Value = nil
 			elseif input.KeyCode ~= Enum.KeyCode.Unknown then
 				obj.Value = input.KeyCode
 			end
-			tween(st, 0.2, { Color = T.Stroke })
-			show()
-			fire(onChange, obj.Value)
+		else
+			-- MouseButton1/2/3 são UserInputType e KeyCode ao mesmo tempo;
+			-- guardamos o UserInputType para identificar a origem no compare.
+			obj.Value = input.UserInputType
 		end
+
+		tween(st, 0.2, { Color = T.Stroke })
+		show()
+		fire(onChange, obj.Value)
 	end)
 	show()
 	return obj
@@ -1175,36 +1215,44 @@ function Card:AddCheckbox(o)
 				end,
 			})
 		end
-		win:_connect(UIS.InputBegan, function(input, gp)
-			if gp or not el.Key or input.KeyCode ~= el.Key then
-				return
-			end
-			if kbEl and kbEl._kb.Waiting then
-				return
-			end
-			if el.Mode == "Hold" then
-				el:Set(true)
-			else
-				flip()
-			end
-		end)
-		win:_connect(UIS.InputEnded, function(input)
-			if el.Mode == "Hold" and el.Key and input.KeyCode == el.Key then
-				el:Set(false)
-			end
-		end)
-		function el:SetKey(k)
-			if kbEl then
-				kbEl:Set(k, true)
-			end
-			self.Key = k
-		end
-	end
+		-- language: Luau, file: NLib.lua — handler do bind do checkbox (dentro de AddCheckbox)
+win:_connect(UIS.InputBegan, function(input, gp)
+    if gp or not el.Key then
+        return
+    end
+    if kbEl and kbEl._kb.Waiting then
+        return
+    end
+    local match
+    if typeof(el.Key) == "EnumItem" and el.Key.EnumType == Enum.UserInputType then
+        match = input.UserInputType == el.Key
+    else
+        match = input.KeyCode == el.Key
+    end
+    if not match then
+        return
+    end
+    if el.Mode == "Hold" then
+        el:Set(true)
+    else
+        flip()
+    end
+end)
 
-	el:Set(o.Default, true, true)
-	return el
-end
-
+win:_connect(UIS.InputEnded, function(input)
+    if el.Mode ~= "Hold" or not el.Key then
+        return
+    end
+    local match
+    if typeof(el.Key) == "EnumItem" and el.Key.EnumType == Enum.UserInputType then
+        match = input.UserInputType == el.Key
+    else
+        match = input.KeyCode == el.Key
+    end
+    if match then
+        el:Set(false)
+    end
+end)
 -- ---------- BUTTON ----------
 function Card:AddButton(o)
 	local win = self.Win
