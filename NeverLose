@@ -1694,6 +1694,7 @@ function Card:AddDropdown(o)
 	return el
 end
 
+
 -- ---------- KEYBIND ----------
 function Card:AddKeybind(o)
 	local win = self.Win
@@ -1716,14 +1717,13 @@ function Card:AddKeybind(o)
 	hit.MouseButton1Click:Connect(function()
 		kb:Begin()
 	end)
-		if o.Callback then
+	if o.Callback then
 		win:_connect(UIS.InputBegan, function(input, gp)
 			if not gp and not kb.Waiting and bindMatches(kb.Value, input) then
 				fire(o.Callback, kb.Value)
 			end
 		end)
 	end
-end
 	function el:Get()
 		return kb.Value
 	end
