@@ -401,6 +401,8 @@ local function drawExpand(parent, color, pos)
 	return h, parts
 end
 
+
+
 -- language: Luau, file: NLib.lua — shortKey com MB1/MB2/MB3
 local function shortKey(k)
     if not k then
@@ -423,6 +425,17 @@ local function shortKey(k)
         end
     end
     return tostring(k)
+end
+
+-- compara um bind (KeyCode OU UserInputType) com um InputObject
+local function bindMatches(key, input)
+    if not key or not input then
+        return false
+    end
+    if typeof(key) == "EnumItem" and key.EnumType == Enum.UserInputType then
+        return input.UserInputType == key
+    end
+    return input.KeyCode == key
 end
 
 -- ====================================================================
@@ -603,9 +616,12 @@ local function keybindBox(win, parent, size, pos, anchor, default, onChange)
 		end
 	end
 
-	btn.MouseButton1Click:Connect(function()
+		btn.MouseButton1Click:Connect(function()
 		obj:Begin()
 	end)
+	-- consome o clique direito para não abrir menu de contexto do jogador
+	-- enquanto o usuário está capturando um bind
+	btn.MouseButton2Click:Connect(function() end)
 	btn.MouseEnter:Connect(function()
 		if not obj.Waiting then
 			tween(btn, 0.15, { BackgroundColor3 = T.FieldHover })
@@ -1215,44 +1231,33 @@ function Card:AddCheckbox(o)
 				end,
 			})
 		end
-		-- language: Luau, file: NLib.lua — handler do bind do checkbox (dentro de AddCheckbox)
-win:_connect(UIS.InputBegan, function(input, gp)
-    if gp or not el.Key then
-        return
-    end
-    if kbEl and kbEl._kb.Waiting then
-        return
-    end
-    local match
-    if typeof(el.Key) == "EnumItem" and el.Key.EnumType == Enum.UserInputType then
-        match = input.UserInputType == el.Key
-    else
-        match = input.KeyCode == el.Key
-    end
-    if not match then
-        return
-    end
-    if el.Mode == "Hold" then
-        el:Set(true)
-    else
-        flip()
-    end
-end)
 
-	win:_connect(UIS.InputEnded, function(input)
-		if el.Mode ~= "Hold" or not el.Key then
-			return
-		end
-		local match
-		if typeof(el.Key) == "EnumItem" and el.Key.EnumType == Enum.UserInputType then
-			match = input.UserInputType == el.Key
-		else
-			match = input.KeyCode == el.Key
-		end
-		if match then
-			el:Set(false)
-		end
-	end) -- fecha function(input) e o _connect
+		-- handler do bind do checkbox (dentro de AddCheckbox)
+		win:_connect(UIS.InputBegan, function(input, gp)
+			if gp or not el.Key then
+				return
+			end
+			if kbEl and kbEl._kb.Waiting then
+				return
+			end
+			if not bindMatches(el.Key, input) then
+				return
+			end
+			if el.Mode == "Hold" then
+				el:Set(true)
+			else
+				flip()
+			end
+		end)
+
+		win:_connect(UIS.InputEnded, function(input)
+			if el.Mode ~= "Hold" or not el.Key then
+				return
+			end
+			if bindMatches(el.Key, input) then
+				el:Set(false)
+			end
+		end)
 
 	end -- fecha o if hasGear
 
@@ -1711,13 +1716,14 @@ function Card:AddKeybind(o)
 	hit.MouseButton1Click:Connect(function()
 		kb:Begin()
 	end)
-	if o.Callback then
+		if o.Callback then
 		win:_connect(UIS.InputBegan, function(input, gp)
-			if not gp and not kb.Waiting and kb.Value and input.KeyCode == kb.Value then
+			if not gp and not kb.Waiting and bindMatches(kb.Value, input) then
 				fire(o.Callback, kb.Value)
 			end
 		end)
 	end
+end
 	function el:Get()
 		return kb.Value
 	end
