@@ -1239,19 +1239,21 @@ win:_connect(UIS.InputBegan, function(input, gp)
     end
 end)
 
-win:_connect(UIS.InputEnded, function(input)
-    if el.Mode ~= "Hold" or not el.Key then
-        return
-    end
-    local match
-    if typeof(el.Key) == "EnumItem" and el.Key.EnumType == Enum.UserInputType then
-        match = input.UserInputType == el.Key
-    else
-        match = input.KeyCode == el.Key
-    end
-    if match then
-        el:Set(false)
-    
+	win:_connect(UIS.InputEnded, function(input)
+		if el.Mode ~= "Hold" or not el.Key then
+			return
+		end
+		local match
+		if typeof(el.Key) == "EnumItem" and el.Key.EnumType == Enum.UserInputType then
+			match = input.UserInputType == el.Key
+		else
+			match = input.KeyCode == el.Key
+		end
+		if match then
+			el:Set(false)
+		end
+	end) -- fecha function(input) e o _connect
+
 	end -- fecha o if hasGear
 
 	el:Set(o.Default, true, true)
